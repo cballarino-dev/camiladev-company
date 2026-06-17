@@ -652,6 +652,8 @@ function setupVacantApplyModalForm() {
     const fields = {
         candidateName: applyModal.querySelector("#candidate-name"),
         candidateEmail: applyModal.querySelector("#candidate-email"),
+        candidatePhonePrefix: applyModal.querySelector("#candidate-phone-prefix"),
+        candidatePhone: applyModal.querySelector("#candidate-phone"),
         candidateCv: applyModal.querySelector("#candidate-cv"),
         englishLevel: applyModal.querySelector("#english-level"),
         experienceYears: applyModal.querySelector("#experience-years"),
@@ -671,6 +673,29 @@ function setupVacantApplyModalForm() {
             if (!value.trim()) return "Este campo es obligatorio.";
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
             if (!emailRegex.test(value.trim())) return "Verifica el formato del correo profesional (ejemplo: nombre@empresa.com).";
+            return "";
+        },
+        candidatePhonePrefix: (value) => (!value ? "Selecciona un prefijo internacional." : ""),
+        candidatePhone: (value) => {
+            if (!value.trim()) return "Este campo es obligatorio.";
+            const allowedPhoneCharacters = /^[\d\s()\-]+$/;
+            if (!allowedPhoneCharacters.test(value.trim())) {
+                return "Ingresa un numero valido: solo numeros, espacios, parentesis y guiones.";
+            }
+
+            const selectedPrefix = fields.candidatePhonePrefix?.value || "";
+            if (!selectedPrefix) return "";
+
+            const localDigits = value.replace(/\D/g, "");
+            if (localDigits.length < 6) {
+                return "El numero local debe tener al menos 6 digitos.";
+            }
+
+            const prefixDigits = selectedPrefix.replace(/\D/g, "");
+            const totalDigits = `${prefixDigits}${localDigits}`;
+            if (!/^\d{9,15}$/.test(totalDigits)) {
+                return "El telefono completo debe tener entre 9 y 15 digitos incluyendo el prefijo internacional.";
+            }
             return "";
         },
         candidateCv: () => {
@@ -855,6 +880,11 @@ function setupVacantApplyModalForm() {
 
     fields.candidateName?.addEventListener("input", () => validateField("candidateName"));
     fields.candidateEmail?.addEventListener("input", () => validateField("candidateEmail"));
+    fields.candidatePhonePrefix?.addEventListener("change", () => {
+        validateField("candidatePhonePrefix");
+        validateField("candidatePhone");
+    });
+    fields.candidatePhone?.addEventListener("input", () => validateField("candidatePhone"));
     fields.candidateCv?.addEventListener("change", () => validateField("candidateCv"));
     fields.englishLevel?.addEventListener("change", () => validateField("englishLevel"));
     fields.experienceYears?.addEventListener("change", () => validateField("experienceYears"));
