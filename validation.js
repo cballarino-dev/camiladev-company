@@ -1,4 +1,29 @@
-// Valida el formulario principal de solicitud en application.html (id: application-form).
+import { AVAILABILITY_MAP } from "./src/utils/collections.js";
+
+function populateAvailabilityOptions(selectElement) {
+    if (!selectElement) return;
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Selecciona tu disponibilidad";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+
+    selectElement.replaceChildren(placeholder);
+
+    Object.entries(AVAILABILITY_MAP).forEach(([key, label]) => {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = label;
+        selectElement.appendChild(option);
+    });
+}
+
+function isAvailabilityKey(value) {
+    return Object.prototype.hasOwnProperty.call(AVAILABILITY_MAP, value);
+}
+
+// Valida el formulario principal de solicitud en contact_form.html (id: application-form).
 function setupApplicationForm() {
     const form = document.getElementById("application-form");
     const feedback = document.getElementById("form-feedback");
@@ -41,6 +66,8 @@ function setupApplicationForm() {
         contactConsent: document.getElementById("contactConsent"),
         accuracyConsent: document.getElementById("accuracyConsent")
     };
+
+    populateAvailabilityOptions(fields.availability);
 
     const validationRules = {
         fullName: (value) => {
@@ -134,7 +161,8 @@ function setupApplicationForm() {
         availability: (value) => {
             const selectedType = fields.applicationType?.value || "";
             if (selectedType !== "vacante") return "";
-            return !value ? "Selecciona tu disponibilidad de incorporación." : "";
+            if (!value) return "Selecciona tu disponibilidad de incorporación.";
+            return isAvailabilityKey(value) ? "" : "Selecciona una disponibilidad válida.";
         },
         message: (value) => {
             if (!value.trim()) return "Describe tu perfil o necesidad del proyecto.";
@@ -172,6 +200,31 @@ function setupApplicationForm() {
         contactConsent: (value, input) => (!input.checked ? "Debes aceptar ser contactado por Nexova." : ""),
         accuracyConsent: (value, input) => (!input.checked ? "Debes confirmar que la información es correcta." : "")
     };
+
+    function syncNativeRequiredState() {
+        const selectedType = fields.applicationType?.value || "";
+        const isVacante = selectedType === "vacante";
+        const isEmpresa = selectedType === "empresa-talento";
+        const nativeLanguage = fields.nativeLanguage?.value || "";
+        const requiresEnglishLevel = isVacante && nativeLanguage === "otro";
+
+        if (fields.currentCompany) fields.currentCompany.required = isEmpresa;
+        if (fields.companySize) fields.companySize.required = isEmpresa;
+
+        if (fields.experienceYears) fields.experienceYears.required = isVacante;
+        if (fields.nativeLanguage) fields.nativeLanguage.required = isVacante;
+        if (fields.salaryCurrency) fields.salaryCurrency.required = isVacante;
+        if (fields.salaryRange) fields.salaryRange.required = isVacante;
+        if (fields.availability) fields.availability.required = isVacante;
+        if (fields.cvFile) fields.cvFile.required = isVacante;
+        if (fields.englishLevel) fields.englishLevel.required = requiresEnglishLevel;
+
+        if (fields.workMode && fields.workMode.length) {
+            fields.workMode.forEach((radio) => {
+                radio.required = isVacante;
+            });
+        }
+    }
 
     function getInputStateTarget(fieldName) {
         if (fieldName === "workMode") {
@@ -346,6 +399,7 @@ function setupApplicationForm() {
     });
 
     fields.applicationType?.addEventListener("change", () => {
+        syncNativeRequiredState();
         validateField("applicationType");
         validateField("professionalEmail");
         validateField("country");
@@ -367,9 +421,12 @@ function setupApplicationForm() {
     });
 
     fields.nativeLanguage?.addEventListener("change", () => {
+        syncNativeRequiredState();
         validateField("nativeLanguage");
         validateField("englishLevel");
     });
+
+    syncNativeRequiredState();
 
     form.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -381,6 +438,15 @@ function setupApplicationForm() {
         }
 
         const selectedType = fields.applicationType?.value || "";
+        if (selectedType === "vacante") {
+            const selectedAvailability = fields.availability?.value || "";
+            if (!isAvailabilityKey(selectedAvailability)) {
+                showError("availability", "Selecciona una disponibilidad válida.");
+                showFeedback("Selecciona una disponibilidad válida antes de enviar la solicitud.", "error");
+                return;
+            }
+        }
+
         const successMessage = selectedType === "empresa-talento"
             ? "Solicitud enviada con éxito. Un consultor de Nexova contactará a tu empresa en menos de 24 horas laborables."
             : "Solicitud enviada con éxito. El equipo de Nexova revisará tu CV y te contactará sobre vacantes afines.";
@@ -401,6 +467,7 @@ function setupApplicationForm() {
     resetButton?.addEventListener("click", () => {
         form.reset();
         feedback.classList.add("hidden");
+        syncNativeRequiredState();
         Object.keys(validationRules).forEach((fieldName) => {
             const stateTarget = getInputStateTarget(fieldName);
             const errorElement = document.getElementById(`error-${fieldName}`);
@@ -609,8 +676,283 @@ function setupLandingDemoForm() {
     });
 }
 
+// Controla validación del formulario del modal de vacantes (vacant.html).
+function setupVacantApplyModalForm() {
+    const applyModal = document.getElementById("apply-modal");
+    if (!applyModal) return;
+
+    const form = applyModal.querySelector("form");
+    const feedback = applyModal.querySelector("#apply-popup-feedback");
+
+    if (!form || !feedback) return;
+
+    const fields = {
+        candidateName: applyModal.querySelector("#candidate-name"),
+        candidateEmail: applyModal.querySelector("#candidate-email"),
+        candidatePhonePrefix: applyModal.querySelector("#candidate-phone-prefix"),
+        candidatePhone: applyModal.querySelector("#candidate-phone"),
+        candidateCv: applyModal.querySelector("#candidate-cv"),
+        englishLevel: applyModal.querySelector("#english-level"),
+        experienceYears: applyModal.querySelector("#experience-years"),
+        seniorityLevel: applyModal.querySelector("#seniority-level"),
+        disponibility: applyModal.querySelector("#disponibility") || applyModal.querySelector("#availability"),
+        salaryExpectation: applyModal.querySelector("#salary-expectation"),
+        candidateSkills: applyModal.querySelector("#candidate-skills")
+    };
+
+    const validationRules = {
+        candidateName: (value) => {
+            if (!value.trim()) return "Este campo es obligatorio.";
+            if (value.trim().length < 5) return "Incluye nombre y apellido para validar tu perfil correctamente.";
+            return "";
+        },
+        candidateEmail: (value) => {
+            if (!value.trim()) return "Este campo es obligatorio.";
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+            if (!emailRegex.test(value.trim())) return "Verifica el formato del correo profesional (ejemplo: nombre@empresa.com).";
+            return "";
+        },
+        candidatePhonePrefix: (value) => (!value ? "Selecciona un prefijo internacional." : ""),
+        candidatePhone: (value) => {
+            if (!value.trim()) return "Este campo es obligatorio.";
+            const allowedPhoneCharacters = /^[\d\s()\-]+$/;
+            if (!allowedPhoneCharacters.test(value.trim())) {
+                return "Ingresa un numero valido: solo numeros, espacios, parentesis y guiones.";
+            }
+
+            const selectedPrefix = fields.candidatePhonePrefix?.value || "";
+            if (!selectedPrefix) return "";
+
+            const localDigits = value.replace(/\D/g, "");
+            if (localDigits.length < 6) {
+                return "El numero local debe tener al menos 6 digitos.";
+            }
+
+            const prefixDigits = selectedPrefix.replace(/\D/g, "");
+            const totalDigits = `${prefixDigits}${localDigits}`;
+            if (!/^\d{9,15}$/.test(totalDigits)) {
+                return "El telefono completo debe tener entre 9 y 15 digitos incluyendo el prefijo internacional.";
+            }
+            return "";
+        },
+        candidateCv: () => {
+            const file = fields.candidateCv?.files?.[0];
+            if (!file) return "Este campo es obligatorio.";
+            const extension = file.name.split(".").pop()?.toLowerCase();
+            const allowedExtensions = ["pdf", "doc", "docx"];
+            if (!allowedExtensions.includes(extension || "")) return "El archivo debe estar en formato PDF, DOC o DOCX.";
+            const maxSize = 5 * 1024 * 1024;
+            if (file.size > maxSize) return "El CV supera el tamaño máximo permitido (5 MB).";
+            return "";
+        },
+        englishLevel: (value) => (!value ? "Este campo es obligatorio." : ""),
+        experienceYears: (value) => (!value ? "Este campo es obligatorio." : ""),
+        seniorityLevel: (value) => (!value ? "Este campo es obligatorio." : ""),
+        disponibility: (value) => (!value ? "Este campo es obligatorio." : ""),
+        salaryExpectation: (value) => {
+            if (!value.trim()) return "Este campo es obligatorio.";
+            if (!/^\d+$/.test(value.trim())) return "Ingresa solo numeros en USD (sin simbolos ni letras).";
+            return "";
+        },
+        candidateSkills: (value) => (!value.trim() ? "Este campo es obligatorio." : "")
+    };
+
+    function getInputStateTarget(fieldName) {
+        return fields[fieldName];
+    }
+
+    function setFieldState(input, status) {
+        if (!input) return;
+        const stateClasses = [
+            "border-rose-400",
+            "border-emerald-400",
+            "border-slate-700",
+            "bg-rose-500/5",
+            "bg-emerald-500/5",
+            "ring-1",
+            "ring-rose-400/50",
+            "ring-emerald-400/40"
+        ];
+        input.classList.remove(...stateClasses);
+
+        if (status === "error") {
+            input.classList.add("border-rose-400", "bg-rose-500/5", "ring-1", "ring-rose-400/50");
+            input.setAttribute("aria-invalid", "true");
+            return;
+        }
+
+        if (status === "success") {
+            input.classList.add("border-emerald-400", "bg-emerald-500/5", "ring-1", "ring-emerald-400/40");
+            input.setAttribute("aria-invalid", "false");
+            return;
+        }
+
+        input.classList.add("border-slate-700");
+        input.removeAttribute("aria-invalid");
+    }
+
+    function setErrorMessageState(errorElement, status) {
+        if (!errorElement) return;
+
+        const toneClasses = [
+            "hidden",
+            "text-rose-300",
+            "text-emerald-300",
+            "border",
+            "border-rose-400/40",
+            "border-emerald-400/40",
+            "bg-rose-500/10",
+            "bg-emerald-500/10",
+            "rounded-lg",
+            "px-3",
+            "py-2",
+            "font-medium"
+        ];
+        errorElement.classList.remove(...toneClasses);
+
+        if (status === "error") {
+            errorElement.classList.add(
+                "text-rose-300",
+                "border",
+                "border-rose-400/40",
+                "bg-rose-500/10",
+                "rounded-lg",
+                "px-3",
+                "py-2",
+                "font-medium"
+            );
+            return;
+        }
+
+        if (status === "success") {
+            errorElement.classList.add(
+                "text-emerald-300",
+                "border",
+                "border-emerald-400/40",
+                "bg-emerald-500/10",
+                "rounded-lg",
+                "px-3",
+                "py-2",
+                "font-medium"
+            );
+            return;
+        }
+
+        errorElement.classList.add("hidden");
+    }
+
+    function showError(fieldName, message) {
+        const errorSelector = fieldName === "disponibility"
+            ? "#apply-error-disponibility, #apply-error-availability"
+            : `#apply-error-${fieldName.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`)}`;
+        const errorElement = applyModal.querySelector(errorSelector);
+        const stateTarget = getInputStateTarget(fieldName);
+
+        if (!errorElement) return;
+
+        if (message) {
+            errorElement.textContent = message;
+            setErrorMessageState(errorElement, "error");
+            setFieldState(stateTarget, "error");
+            return;
+        }
+
+        errorElement.textContent = "";
+        setErrorMessageState(errorElement, "default");
+        setFieldState(stateTarget, "success");
+    }
+
+    function validateField(fieldName) {
+        const rule = validationRules[fieldName];
+        const field = fields[fieldName];
+        if (!rule || !field) return true;
+
+        const value = fieldName === "candidateCv"
+            ? ""
+            : field.value || "";
+
+        const error = rule(value, field);
+        showError(fieldName, error);
+        return !error;
+    }
+
+    function validateAll() {
+        let firstInvalidField = null;
+        let hasErrors = false;
+
+        Object.keys(validationRules).forEach((fieldName) => {
+            const isValid = validateField(fieldName);
+            if (!isValid && !firstInvalidField) {
+                firstInvalidField = getInputStateTarget(fieldName);
+            }
+            if (!isValid) hasErrors = true;
+        });
+
+        if (hasErrors && firstInvalidField?.focus) firstInvalidField.focus();
+        return !hasErrors;
+    }
+
+    function showFeedback(message, type) {
+        feedback.textContent = message;
+        feedback.classList.remove(
+            "hidden",
+            "border-rose-400",
+            "bg-rose-500/10",
+            "text-rose-200",
+            "border-emerald-400",
+            "bg-emerald-500/10",
+            "text-emerald-200",
+            "shadow-lg",
+            "shadow-rose-500/10",
+            "shadow-emerald-500/10"
+        );
+
+        if (type === "error") {
+            feedback.classList.add("border-rose-400", "bg-rose-500/10", "text-rose-200", "shadow-lg", "shadow-rose-500/10");
+            return;
+        }
+
+        feedback.classList.add("border-emerald-400", "bg-emerald-500/10", "text-emerald-200", "shadow-lg", "shadow-emerald-500/10");
+    }
+
+    fields.candidateName?.addEventListener("input", () => validateField("candidateName"));
+    fields.candidateEmail?.addEventListener("input", () => validateField("candidateEmail"));
+    fields.candidatePhonePrefix?.addEventListener("change", () => {
+        validateField("candidatePhonePrefix");
+        validateField("candidatePhone");
+    });
+    fields.candidatePhone?.addEventListener("input", () => validateField("candidatePhone"));
+    fields.candidateCv?.addEventListener("change", () => validateField("candidateCv"));
+    fields.englishLevel?.addEventListener("change", () => validateField("englishLevel"));
+    fields.experienceYears?.addEventListener("change", () => validateField("experienceYears"));
+    fields.seniorityLevel?.addEventListener("change", () => validateField("seniorityLevel"));
+    fields.disponibility?.addEventListener("change", () => validateField("disponibility"));
+    fields.salaryExpectation?.addEventListener("input", (event) => {
+        const input = event.target;
+        if (!input) return;
+        input.value = input.value.replace(/\D/g, "");
+        validateField("salaryExpectation");
+    });
+    fields.candidateSkills?.addEventListener("input", () => validateField("candidateSkills"));
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const isValid = validateAll();
+        if (!isValid) {
+            showFeedback("Debes completar los campos obligatorios marcados en rojo antes de enviar tu postulación.", "error");
+            return;
+        }
+
+        showFeedback("Información completada correctamente. Tu postulación está lista para continuar en el proceso.", "success");
+        form.reset();
+        Object.keys(validationRules).forEach((fieldName) => showError(fieldName, ""));
+    });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     setupApplicationForm();
     setupContactForm();
     setupLandingDemoForm();
+    setupVacantApplyModalForm();
 });

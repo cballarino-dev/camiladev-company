@@ -21,11 +21,13 @@ Este repositorio es la **plantilla de inicio** para los proyectos transversales.
 
 ## Estado actual de la plantilla
 
-Actualmente el repositorio ofrece una **estructura base de carpetas y documentación**, pero todavía no incluye aplicaciones ejecutables ni scripts globales en la raíz.
+Actualmente el repositorio ofrece una **estructura base de carpetas y documentación**, junto con una web estática funcional y scripts de desarrollo en la raíz.
 
 - `CONTEXT.md` es un placeholder y debe sustituirse por el contexto de la empresa asignada.
 - No existe todavía un `AGENTS.md` en la raíz.
-- Existe metadata del paquete compartido en `packages/shared/package.json` (`@repo/shared-types`), pero aún no hay runner de workspace en raíz.
+- Existen scripts de desarrollo y verificación en la raíz (`dev`, `check:routes`, `typecheck`, `test`).
+- La lógica de disponibilidad del formulario usa una fuente de verdad en TypeScript (`src/utils/collections.ts`) y es consumida por JavaScript (`validation.js`).
+- Existe metadata del paquete compartido en `packages/shared/package.json` (`@repo/shared-types`).
 
 ---
 
@@ -61,6 +63,53 @@ ai-engineering-company-project-monorepo/
 3. **Reemplaza** `CONTEXT.md` con el contexto completo de tu empresa asignada.
 4. **Revisa** los `README.md` de cada carpeta raíz para entender responsabilidades (`uis/`, `services/`, `data/`, `skills/`, etc.).
 5. **Empieza a implementar** entregables por hito en `uis/` y `services/`, reutilizando `packages/shared/` y `data/` según corresponda.
+
+## Ejecutar la web
+
+Comandos recomendados para este repositorio:
+
+```bash
+npm install
+npm run dev
+```
+
+Esto levanta el servidor estático en `http://127.0.0.1:8080` sirviendo la raíz del proyecto (`.`), donde ahora están `index.html`, `validation.js` y la carpeta `pages/`.
+
+En Codespaces, abre el puerto `8080` desde la pestaña **Ports** y selecciona **Open in Browser**.
+
+## Verificación durante desarrollo
+
+Además del servidor web, se recomienda validar tipado y tests de forma frecuente:
+
+```bash
+npm run typecheck
+npm test
+```
+
+- `npm run typecheck`: ejecuta TypeScript en modo verificación (`tsc --noEmit`).
+- `npm test`: ejecuta la suite de pruebas de validaciones.
+
+## Chequeo rápido de rutas
+
+Con el servidor arriba (`npm run dev`), ejecuta:
+
+```bash
+npm run check:routes
+```
+
+El script valida que carguen correctamente:
+
+- `/`
+- `/validation.js`
+- `/pages/contact_form.html`
+- `/pages/vacant.html`
+
+## Fuente de verdad para disponibilidad
+
+La disponibilidad del formulario se centraliza en TypeScript:
+
+- `src/utils/collections.ts` define `AvailabilityOption` y `AVAILABILITY_MAP`.
+- `validation.js` importa `AVAILABILITY_MAP`, inyecta dinámicamente las opciones del `<select id="availability">` y valida que el valor seleccionado exista en el mapa.
 
 ---
 
